@@ -7,6 +7,7 @@
 #include <string_view>
 #include <variant>
 #include <vector>
+#include <cassert>
 
 // Позиция ячейки. Индексация с нуля.
 struct Position {
@@ -30,7 +31,10 @@ struct Size {
     int rows = 0;
     int cols = 0;
 
-    bool operator==(Size rhs) const;
+    bool operator==(Size rhs) const
+    {
+        return std::tie(rows, cols) == std::tie(rhs.rows, rhs.cols); 
+    }
 };
 
 // Описывает ошибки, которые могут возникнуть при вычислении формулы.
@@ -39,22 +43,52 @@ public:
     enum class Category {
         Ref,    // ссылка на ячейку с некорректной позицией
         Value,  // ячейка не может быть трактована как число
-        Div0,  // в результате вычисления возникло деление на ноль
+        Arithmetic,  // некорректная арифметическая операция
     };
 
-    FormulaError(Category category);
+    FormulaError(Category category) : category_(category)
+    {}
 
-    Category GetCategory() const;
+    Category GetCategory() const
+    {
+        return category_;
+    }
 
-    bool operator==(FormulaError rhs) const;
+    bool operator==(FormulaError rhs) const
+    {
+        return category_ == rhs.category_;
+    }
 
-    std::string_view ToString() const;
+    std::string_view ToString() const
+    {
+        std::string res;
+        switch (category_)
+        {
+        case Category::Ref:
+            res = "#REF!";
+            break;
+        case Category::Value:
+            res = "#VALUE!";
+            break;
+        case Category::Arithmetic:
+            res = "#ARITHM!";
+            break;
+        
+        default:
+            assert(false);
+            break;
+        }
+        return res;
+    }
 
 private:
     Category category_;
 };
 
-std::ostream& operator<<(std::ostream& output, FormulaError fe);
+inline std::ostream& operator<<(std::ostream& output, const FormulaError& fe)
+{
+    return (output << (std::string)fe.ToString());
+}
 
 // Исключение, выбрасываемое при попытке передать в метод некорректную позицию
 class InvalidPositionException : public std::out_of_range {
